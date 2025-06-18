@@ -238,6 +238,8 @@ func (c *Core) InitTmpDir() InitHandler {
 func (c *Core) InitCopyFs(dir string, fsys fs.FS) InitHandler {
 	return func() error {
 		logInit("CopyFS")
+		// nolint: mnd
+		_ = os.MkdirAll(dir, 0755)
 		return os.CopyFS(dir, fsys)
 	}
 }
@@ -282,7 +284,7 @@ func (c *Core) Shutdown() {
 	}
 
 	if c.TmpDir != "" {
-		logDown(nil, "TmpDir Cleanup")
+		logDown("TmpDir", "TmpDir Cleanup")
 		_ = os.RemoveAll(c.TmpDir)
 		c.TmpDir = ""
 	}
