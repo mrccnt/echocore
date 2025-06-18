@@ -19,6 +19,7 @@ import (
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"io/fs"
 	"net/http"
 	"os"
 	"os/signal"
@@ -33,6 +34,7 @@ type Core struct {
 	Gorm      *gorm.DB
 	Redis     *redis.Client
 	SessStore *redstore.RedisStore
+	TmpDir    string
 }
 
 type InitHandler func() error
@@ -224,6 +226,22 @@ func (c *Core) InitSessStore() InitHandler {
 	}
 }
 
+func (c *Core) InitTmpDir() InitHandler {
+	return func() error {
+		logInit("TmpDir")
+		var err error
+		c.TmpDir, err = os.MkdirTemp("", "")
+		return err
+	}
+}
+
+func (c *Core) InitCopyFs(dir string, fsys fs.FS) InitHandler {
+	return func() error {
+		logInit("CopyFS")
+		return os.CopyFS(dir, fsys)
+	}
+}
+
 func (c *Core) ListenSig(ch chan os.Signal, e *echo.Echo, wg *sync.WaitGroup) {
 
 	sig := <-ch
@@ -261,6 +279,12 @@ func (c *Core) Shutdown() {
 			_ = db.Close()
 		}
 		c.Gorm = nil
+	}
+
+	if c.TmpDir != "" {
+		logDown(nil, "TmpDir Cleanup")
+		_ = os.RemoveAll(c.TmpDir)
+		c.TmpDir = ""
 	}
 }
 
