@@ -76,14 +76,17 @@ func SessionMiddleware(cfg *Config) echo.MiddlewareFunc {
 }
 
 func StaticMiddleware(docroot string, fs *embed.FS) echo.MiddlewareFunc {
-	return middleware.StaticWithConfig(middleware.StaticConfig{
-		Skipper:    middleware.DefaultSkipper,
-		Root:       docroot,
-		Filesystem: http.FS(fs),
-	})
+	cfg := middleware.StaticConfig{
+		Skipper: middleware.DefaultSkipper,
+		Root:    docroot,
+	}
+	if fs != nil {
+		cfg.Filesystem = http.FS(fs)
+	}
+	return middleware.StaticWithConfig(cfg)
 }
 
-func LastModifiedMiddleware(t *time.Time) echo.MiddlewareFunc {
+func LastModifiedMiddleware(t time.Time) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		loc, _ := time.LoadLocation("GMT")
 		return func(c echo.Context) error {
