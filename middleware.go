@@ -1,10 +1,14 @@
 package echocore
 
 import (
+	"embed"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/mrccnt/echocore/redstore"
 	"github.com/sirupsen/logrus"
+	"net/http"
+	"slices"
+	"time"
 )
 
 func LoggerMiddleware(tformat, lformat string, skip []string) echo.MiddlewareFunc {
@@ -17,11 +21,8 @@ func LoggerMiddleware(tformat, lformat string, skip []string) echo.MiddlewareFun
 
 func GzipMiddleware(level int) echo.MiddlewareFunc {
 	return middleware.GzipWithConfig(middleware.GzipConfig{
-		Skipper: func(_ echo.Context) bool {
-			// return strings.Contains(c.SelfURL(), "metrics") // Change "metrics" for your own path
-			return false
-		},
-		Level: level,
+		Skipper: middleware.DefaultSkipper,
+		Level:   level,
 	})
 }
 
@@ -74,18 +75,34 @@ func SessionMiddleware(cfg *Config) echo.MiddlewareFunc {
 	}
 }
 
+func StaticMiddleware(docroot string, fs *embed.FS) echo.MiddlewareFunc {
+	return middleware.StaticWithConfig(middleware.StaticConfig{
+		Skipper:    middleware.DefaultSkipper,
+		Root:       docroot,
+		Filesystem: http.FS(fs),
+	})
+}
+
+func LastModifiedMiddleware(t *time.Time) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		loc, _ := time.LoadLocation("GMT")
+		return func(c echo.Context) error {
+			if c.Path() == "/*" {
+				c.Request().Header.Set("Last-Modified", t.In(loc).Format(time.RFC1123))
+			}
+			return next(c)
+		}
+	}
+}
+
 func SkipperRouteName(routeNames []string) func(c echo.Context) bool {
 	return func(c echo.Context) bool {
 		if len(routeNames) == 0 {
 			return false
 		}
 		for _, r := range c.Echo().Routes() {
-			if r.Method == c.Request().Method && r.Path == c.Path() {
-				for _, key := range routeNames {
-					if key == r.Name {
-						return true
-					}
-				}
+			if slices.Contains(routeNames, r.Name) {
+				return true
 			}
 		}
 		return false
